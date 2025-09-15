@@ -1,0 +1,53 @@
+{
+ "_liked_by": "[\"Administrator\"]",
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2025-09-15 12:30:26.964759",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "page",
+  "page_name",
+  "visible"
+ ],
+ "fields": [
+  {
+   "fieldname": "page_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Page Name",
+   "read_only": 1
+  },
+  {
+   "fieldname": "page",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Page",
+   "options": "Wiki Page",
+   "reqd": 1,
+   "unique": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "visible",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Visible"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2025-09-15 12:54:31.109255",
+ "modified_by": "Administrator",
+ "module": "Wiki",
+ "name": "Wiki Page Access",
+ "owner": "Administrator",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}

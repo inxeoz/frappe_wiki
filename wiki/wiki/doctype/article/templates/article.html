@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>{{ doc.title if doc else title or "Articles" }}</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        background: #f8f9fa;
+        margin: 0;
+        padding: 20px;
+      }
+      .container {
+        max-width: 800px;
+        margin: auto;
+        background: white;
+        padding: 20px;
+        border-radius: 10px;
+      }
+      h1 {
+        color: #333;
+      }
+      a {
+        color: #007bff;
+        text-decoration: none;
+      }
+      a:hover {
+        text-decoration: underline;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      {% if doc %}
+        <h1>{{ doc.title }}</h1>
+        <p>{{ doc.content }}</p>
+      {% else %}
+        <h1>{{ title or "Articles" }}</h1>
+        <ul>
+          {% for a in articles %}
+            <li><a href="/article/{{ a.route or a.name }}">{{ a.title }}</a></li>
+          {% endfor %}
+        </ul>
+      {% endif %}
+    </div>
+  </body>
+</html>

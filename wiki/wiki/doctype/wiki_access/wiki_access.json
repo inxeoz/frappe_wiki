@@ -1,0 +1,45 @@
+{
+ "_liked_by": "[\"Administrator\"]",
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2025-09-15 12:45:06.833783",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "wiki_space_access",
+  "enabled"
+ ],
+ "fields": [
+  {
+   "default": "0",
+   "fieldname": "enabled",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Enabled"
+  },
+  {
+   "allow_in_quick_entry": 1,
+   "fieldname": "wiki_space_access",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Wiki Space Access",
+   "options": "Wiki Space Access",
+   "reqd": 1
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2025-09-15 12:48:08.429877",
+ "modified_by": "Administrator",
+ "module": "Wiki",
+ "name": "Wiki Access",
+ "owner": "Administrator",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}
