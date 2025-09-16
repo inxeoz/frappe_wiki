@@ -3,6 +3,8 @@
 
 
 import re
+import logging
+import os
 from urllib.parse import urlencode
 
 import frappe
@@ -24,6 +26,24 @@ from frappe.website.website_generator import WebsiteGenerator
 from wiki.wiki.doctype.wiki_page.search import build_index_in_background, drop_index
 from wiki.wiki.doctype.wiki_settings.wiki_settings import get_all_spaces
 
+# Configure logging levels to reduce Flask system debug
+if os.getenv('WIKI_DEBUG_ONLY', '0') == '1':
+	# Suppress Flask and Werkzeug debug messages
+	logging.getLogger('werkzeug').setLevel(logging.WARNING)
+	logging.getLogger().setLevel(logging.WARNING)
+
+# Custom logger for wiki debug messages
+wiki_logger = logging.getLogger('wiki.debug')
+wiki_logger.setLevel(logging.DEBUG)
+
+# Only add handler if not already added
+if not wiki_logger.handlers:
+	handler = logging.StreamHandler()
+	formatter = logging.Formatter('\033[91mWIKI DEBUG:\033[0m %(message)s')
+	handler.setFormatter(formatter)
+	wiki_logger.addHandler(handler)
+	wiki_logger.propagate = False  # Prevent propagation to root logger
+
 # Color codes for debugging
 class DebugColors:
 	RED = '\033[91m'
@@ -38,8 +58,9 @@ class DebugColors:
 	END = '\033[0m'
 
 def debug_print(message, color=DebugColors.RED):
-	"""Print colored debug message"""
-	print(f"{color}DEBUG:{DebugColors.END} {message}")
+	"""Print colored debug message using custom logger"""
+	formatted_message = f"{color}{message}{DebugColors.END}"
+	wiki_logger.debug(formatted_message)
 
 
 class WikiPage(WebsiteGenerator):
@@ -210,11 +231,16 @@ class WikiPage(WebsiteGenerator):
 		wiki_access_list = frappe.get_all("Wiki Access", 
 										  filters={"parent": user_access, "enabled": 1},
 										  fields=["wiki_space_access"])
+
+		debug_print(f"{DebugColors.RED}--{wiki_access_list}---{DebugColors.END}", DebugColors.RED)
 		
 		# Get current page's wiki space
 		wiki_space = frappe.get_value("Wiki Group Item", 
 									  {"wiki_page": self.name}, 
 									  "parent")
+
+		debug_print(f"{DebugColors.RED}--{wiki_space}---{DebugColors.END}", DebugColors.RED)
+
 		
 		if not wiki_space:
 			return False  # No space = deny access (require explicit permission)
@@ -222,12 +248,15 @@ class WikiPage(WebsiteGenerator):
 		# Check if user has access to this space
 		for access_item in wiki_access_list:
 			space_access = frappe.get_doc("Wiki Space Access", access_item.wiki_space_access)
-			
+
 			if space_access.wiki_space == wiki_space:
 				# Check specific page access
 				page_access = frappe.get_value("Wiki Page Access",
 											  {"parent": space_access.name, "page": self.name},
 											  "visible")
+
+				debug_print(f"{DebugColors.YELLOW}--{page_access}---{DebugColors.END}", DebugColors.RED)
+
 				
 				if page_access is not None:
 					return bool(page_access)  # Explicit page setting (0 or 1)
