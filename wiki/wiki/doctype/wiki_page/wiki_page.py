@@ -24,6 +24,23 @@ from frappe.website.website_generator import WebsiteGenerator
 from wiki.wiki.doctype.wiki_page.search import build_index_in_background, drop_index
 from wiki.wiki.doctype.wiki_settings.wiki_settings import get_all_spaces
 
+# Color codes for debugging
+class DebugColors:
+	RED = '\033[91m'
+	GREEN = '\033[92m'
+	YELLOW = '\033[93m'
+	BLUE = '\033[94m'
+	MAGENTA = '\033[95m'
+	CYAN = '\033[96m'
+	WHITE = '\033[97m'
+	BOLD = '\033[1m'
+	UNDERLINE = '\033[4m'
+	END = '\033[0m'
+
+def debug_print(message, color=DebugColors.RED):
+	"""Print colored debug message"""
+	print(f"{color}DEBUG:{DebugColors.END} {message}")
+
 
 class WikiPage(WebsiteGenerator):
 	def before_save(self):
@@ -175,13 +192,18 @@ class WikiPage(WebsiteGenerator):
 	def check_user_access(self, user):
 		"""Check if user has access to this wiki page through access control system"""
 		
+		# DEBUG: Log access check with colors
+		debug_print(f"Checking access for user: {DebugColors.BLUE}{user}{DebugColors.END}, page: {DebugColors.YELLOW}{self.name}{DebugColors.END}")
+		
 		# Get user's wiki access
 		user_access = frappe.get_value("Wiki User Access", 
 									   {"user": user, "docstatus": 1}, 
 									   "name")
 		
+		debug_print(f"User access document found: {DebugColors.CYAN}{user_access}{DebugColors.END}")
+		
 		if not user_access:
-			# No specific access control = DENY access (default behavior: explicit permission required)
+			debug_print(f"{DebugColors.RED}No Wiki User Access document for {user} - DENYING access{DebugColors.END}", DebugColors.RED)
 			return False
 		
 		# Get user's access list
