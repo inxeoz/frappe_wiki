@@ -57,7 +57,7 @@ class DebugColors:
 	UNDERLINE = '\033[4m'
 	END = '\033[0m'
 
-def debug_print(message, color=DebugColors.RED):
+def debug_print(message, color=DebugColors.YELLOW):
 	"""Print colored debug message using custom logger"""
 	formatted_message = f"{color}{message}{DebugColors.END}"
 	wiki_logger.debug(formatted_message)
@@ -210,61 +210,81 @@ class WikiPage(WebsiteGenerator):
 			frappe.local.response["location"] = "/login?" + urlencode({"redirect-to": frappe.request.url})
 			raise frappe.Redirect
 
-	def check_user_access(self, user):
-		"""Check if user has access to this wiki page through access control system"""
+	def get_user_accessible_pages(self, user):
+		"""Get list of all pages user has access to based on Wiki Space Access -> Wiki Page Access"""
 		
-		# DEBUG: Log access check with colors
-		debug_print(f"Checking access for user: {DebugColors.BLUE}{user}{DebugColors.END}, page: {DebugColors.YELLOW}{self.name}{DebugColors.END}")
+		debug_print(f"Getting accessible pages for user: {DebugColors.BLUE}{user}{DebugColors.END}")
 		
-		# Get user's wiki access
+		if frappe.session.user == "Guest":
+			debug_print("Guest user - no custom access control")
+			return []
+		
+		# Get user's wiki access document
 		user_access = frappe.get_value("Wiki User Access", 
 									   {"user": user, "docstatus": 1}, 
 									   "name")
 		
-		debug_print(f"User access document found: {DebugColors.CYAN}{user_access}{DebugColors.END}")
-		
 		if not user_access:
-			debug_print(f"{DebugColors.RED}No Wiki User Access document for {user} - DENYING access{DebugColors.END}", DebugColors.RED)
-			return False
+			debug_print(f"No Wiki User Access document for {user}")
+			return []
 		
-		# Get user's access list
+		# Get user's wiki access list from the child table
 		wiki_access_list = frappe.get_all("Wiki Access", 
 										  filters={"parent": user_access, "enabled": 1},
 										  fields=["wiki_space_access"])
 
-		debug_print(f"{DebugColors.RED}--{wiki_access_list}---{DebugColors.END}", DebugColors.RED)
-		
-		# Get current page's wiki space
-		wiki_space = frappe.get_value("Wiki Group Item", 
-									  {"wiki_page": self.name}, 
-									  "parent")
+		debug_print(f"Found {len(wiki_access_list)} enabled Wiki Access entries")
 
-		debug_print(f"{DebugColors.RED}--{wiki_space}---{DebugColors.END}", DebugColors.RED)
-
+		accessible_pages = []
 		
-		if not wiki_space:
-			return False  # No space = deny access (require explicit permission)
-		
-		# Check if user has access to this space
 		for access_item in wiki_access_list:
-			space_access = frappe.get_doc("Wiki Space Access", access_item.wiki_space_access)
-
-			if space_access.wiki_space == wiki_space:
-				# Check specific page access
-				page_access = frappe.get_value("Wiki Page Access",
-											  {"parent": space_access.name, "page": self.name},
-											  "visible")
-
-				debug_print(f"{DebugColors.YELLOW}--{page_access}---{DebugColors.END}", DebugColors.RED)
-
+			try:
+				space_access = frappe.get_doc("Wiki Space Access", access_item.wiki_space_access)
+				debug_print(f"Processing Wiki Space Access: {space_access.name} for space: {space_access.wiki_space}")
 				
-				if page_access is not None:
-					return bool(page_access)  # Explicit page setting (0 or 1)
-				else:
-					return True  # Space access without explicit page restriction = allow
+				# Get all visible pages from this space access (access_list field)
+				page_access_list = frappe.get_all("Wiki Page Access",
+												filters={"parent": space_access.name, "visible": 1},
+												fields=["page"])
+				
+				debug_print(f"Found {len(page_access_list)} visible pages in space access {space_access.name}")
+				
+				for page_access in page_access_list:
+					if page_access.page not in accessible_pages:
+						accessible_pages.append(page_access.page)
+						debug_print(f"Added page to accessible list: {page_access.page}")
+						
+			except Exception as e:
+				debug_print(f"Error loading space access {access_item.wiki_space_access}: {e}")
 		
-		# User doesn't have access to this space = deny
-		return False
+		debug_print(f"User {user} has access to {len(accessible_pages)} pages: {accessible_pages}")
+		return accessible_pages
+
+	def check_user_access(self, user):
+		"""Check if user has access to this specific wiki page for customized documentation"""
+		
+		debug_print(f"Checking page access for user: {DebugColors.BLUE}{user}{DebugColors.END}, page: {DebugColors.YELLOW}{self.name}{DebugColors.END}")
+		
+		# For guests, use the existing allow_guest logic
+		if user == "Guest":
+			debug_print(f"Guest user - using allow_guest: {self.allow_guest}")
+			return self.allow_guest
+		
+		# Get user's accessible pages
+		accessible_pages = self.get_user_accessible_pages(user)
+		
+		# Check if current page is in user's accessible pages
+		has_access = self.name in accessible_pages
+		
+		debug_print(f"Page {self.name} in user's accessible pages: {DebugColors.CYAN}{has_access}{DebugColors.END}")
+		
+		# If user has no Wiki User Access document, fall back to allow_guest behavior
+		# This allows existing functionality to work while adding customization
+		if not accessible_pages:
+			debug_print(f"No custom access control - falling back to allow_guest: {self.allow_guest}")
+			return self.allow_guest
+		
+		return has_access
 
 	def set_breadcrumbs(self, context):
 		context.add_breadcrumbs = True
@@ -457,6 +477,14 @@ class WikiPage(WebsiteGenerator):
 	def get_sidebar_items(self):
 		wiki_sidebar = frappe.get_doc("Wiki Space", {"route": self.get_space_route()}).wiki_sidebars
 		sidebar = {}
+		
+		# Get user's accessible pages for customized sidebar
+		current_user = frappe.session.user
+		user_accessible_pages = []
+		
+		if current_user != "Guest":
+			user_accessible_pages = self.get_user_accessible_pages(current_user)
+			debug_print(f"Filtering sidebar for user {current_user} with {len(user_accessible_pages)} accessible pages")
 
 		for sidebar_item in wiki_sidebar:
 			if sidebar_item.hide_on_sidebar:
@@ -464,9 +492,19 @@ class WikiPage(WebsiteGenerator):
 
 			wiki_page = frappe.get_cached_doc("Wiki Page", sidebar_item.wiki_page)
 
-			permitted = wiki_page.allow_guest or frappe.session.user != "Guest"
-			if not permitted:
+			# Check basic permission (guest access)
+			basic_permitted = wiki_page.allow_guest or current_user != "Guest"
+			if not basic_permitted:
 				continue
+			
+			# For logged-in users, check customized access
+			if current_user != "Guest":
+				# If user has custom access control, check if page is in their accessible list
+				if user_accessible_pages:
+					if wiki_page.name not in user_accessible_pages:
+						debug_print(f"Excluding page {wiki_page.name} from sidebar - not in user's accessible pages")
+						continue
+				# If no custom access control, show all pages (fallback behavior)
 
 			if sidebar_item.parent_label not in sidebar:
 				sidebar[sidebar_item.parent_label] = [
@@ -489,6 +527,7 @@ class WikiPage(WebsiteGenerator):
 					}
 				]
 
+		debug_print(f"Sidebar built with {sum(len(items) for items in sidebar.values())} total items")
 		return self.get_items(sidebar)
 
 	def get_last_revision(self):
@@ -718,6 +757,20 @@ def get_source(resolved_route, jenv):
 def get_sidebar_for_page(wiki_page):
 	sidebar = frappe.get_cached_doc("Wiki Page", wiki_page).get_sidebar_items()
 	return sidebar
+
+
+@frappe.whitelist()
+def get_user_accessible_pages(user=None):
+	"""API endpoint to get all pages accessible to a specific user"""
+	if not user:
+		user = frappe.session.user
+	
+	if user == "Guest":
+		return []
+	
+	# Create a dummy wiki page instance to use the method
+	wiki_page = frappe.get_doc("Wiki Page", {"name": "dummy"})
+	return wiki_page.get_user_accessible_pages(user)
 
 
 @frappe.whitelist()
