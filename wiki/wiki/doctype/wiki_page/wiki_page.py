@@ -3,8 +3,6 @@
 
 
 import re
-import logging
-import os
 from urllib.parse import urlencode
 
 import frappe
@@ -25,42 +23,6 @@ from frappe.website.website_generator import WebsiteGenerator
 
 from wiki.wiki.doctype.wiki_page.search import build_index_in_background, drop_index
 from wiki.wiki.doctype.wiki_settings.wiki_settings import get_all_spaces
-
-# Configure logging levels to reduce Flask system debug
-if os.getenv('WIKI_DEBUG_ONLY', '0') == '1':
-	# Suppress Flask and Werkzeug debug messages
-	logging.getLogger('werkzeug').setLevel(logging.WARNING)
-	logging.getLogger().setLevel(logging.WARNING)
-
-# Custom logger for wiki debug messages
-wiki_logger = logging.getLogger('wiki.debug')
-wiki_logger.setLevel(logging.DEBUG)
-
-# Only add handler if not already added
-if not wiki_logger.handlers:
-	handler = logging.StreamHandler()
-	formatter = logging.Formatter('\033[91mWIKI DEBUG:\033[0m %(message)s')
-	handler.setFormatter(formatter)
-	wiki_logger.addHandler(handler)
-	wiki_logger.propagate = False  # Prevent propagation to root logger
-
-# Color codes for debugging
-class DebugColors:
-	RED = '\033[91m'
-	GREEN = '\033[92m'
-	YELLOW = '\033[93m'
-	BLUE = '\033[94m'
-	MAGENTA = '\033[95m'
-	CYAN = '\033[96m'
-	WHITE = '\033[97m'
-	BOLD = '\033[1m'
-	UNDERLINE = '\033[4m'
-	END = '\033[0m'
-
-def debug_print(message, color=DebugColors.YELLOW):
-	"""Print colored debug message using custom logger"""
-	formatted_message = f"{color}{message}{DebugColors.END}"
-	wiki_logger.debug(formatted_message)
 
 
 class WikiPage(WebsiteGenerator):
@@ -193,7 +155,6 @@ class WikiPage(WebsiteGenerator):
 	def verify_permission(self):
 		wiki_settings = frappe.get_single("Wiki Settings")
 		user_is_guest = frappe.session.user == "Guest"
-		current_user = frappe.session.user
 
 		disable_guest_access = False
 		if wiki_settings.disable_guest_access and user_is_guest:
@@ -201,153 +162,10 @@ class WikiPage(WebsiteGenerator):
 
 		access_permitted = self.allow_guest or not user_is_guest
 
-		# Check user-specific access control for all users (including logged-in)
-		if not user_is_guest:
-			access_permitted = access_permitted and self.check_user_access(current_user)
-
-		# Check edit permissions if user is trying to edit the page
-		if frappe.form_dict.get("editWiki") and not user_is_guest:
-			debug_print(f"Edit mode requested for page {self.name}")
-			edit_permitted = self.check_user_edit_permission(current_user)
-			debug_print(f"Edit permission granted: {DebugColors.CYAN}{edit_permitted}{DebugColors.END}")
-			
-			if not edit_permitted:
-				debug_print(f"{DebugColors.RED}Edit access denied for page {self.name}{DebugColors.END}")
-				frappe.throw(_("You don't have permission to edit this page"), frappe.PermissionError)
-
 		if not access_permitted or disable_guest_access:
 			frappe.local.response["type"] = "redirect"
 			frappe.local.response["location"] = "/login?" + urlencode({"redirect-to": frappe.request.url})
 			raise frappe.Redirect
-
-	def get_user_accessible_pages(self, user, return_permissions=False):
-		"""Get list of all pages user has access to based on Wiki Space Access -> Wiki Page Access
-		
-		Args:
-			user: User to check access for
-			return_permissions: If True, returns dict with view/edit permissions, else just page list
-		"""
-		
-		debug_print(f"Getting accessible pages for user: {DebugColors.BLUE}{user}{DebugColors.END}")
-		
-		if frappe.session.user == "Guest":
-			debug_print("Guest user - no custom access control")
-			return [] if not return_permissions else {}
-		
-		# Get user's wiki access document
-		user_access = frappe.get_value("Wiki User Access", 
-									   {"user": user, "docstatus": 1}, 
-									   "name")
-		
-		if not user_access:
-			debug_print(f"No Wiki User Access document for {user}")
-			return [] if not return_permissions else {}
-		
-		# Get user's wiki access list from the child table
-		wiki_access_list = frappe.get_all("Wiki Access", 
-										  filters={"parent": user_access, "enabled": 1},
-										  fields=["wiki_space_access"])
-
-		debug_print(f"Found {len(wiki_access_list)} enabled Wiki Access entries")
-
-		accessible_pages = []
-		page_permissions = {}  # {page_name: {view: bool, edit: bool}}
-		
-		for access_item in wiki_access_list:
-			try:
-				space_access = frappe.get_doc("Wiki Space Access", access_item.wiki_space_access)
-				debug_print(f"Processing Wiki Space Access: {space_access.name} for space: {space_access.wiki_space}")
-				
-				# Get all visible pages from this space access with permissions
-				page_access_list = frappe.get_all("Wiki Page Access",
-												filters={"parent": space_access.name, "visible": 1},
-												fields=["page", "visible", "editable"])
-				
-				debug_print(f"Found {len(page_access_list)} visible pages in space access {space_access.name}")
-				
-				for page_access in page_access_list:
-					page_name = page_access.page
-					
-					if page_name not in accessible_pages:
-						accessible_pages.append(page_name)
-						debug_print(f"Added page to accessible list: {page_name}")
-					
-					# Track permissions (give most permissive access if multiple entries)
-					if page_name not in page_permissions:
-						page_permissions[page_name] = {
-							"view": bool(page_access.visible),
-							"edit": bool(page_access.editable)
-						}
-					else:
-						# If page appears in multiple access lists, use OR logic (most permissive)
-						page_permissions[page_name]["view"] = page_permissions[page_name]["view"] or bool(page_access.visible)
-						page_permissions[page_name]["edit"] = page_permissions[page_name]["edit"] or bool(page_access.editable)
-					
-					debug_print(f"Page {page_name} permissions: view={page_permissions[page_name]['view']}, edit={page_permissions[page_name]['edit']}")
-						
-			except Exception as e:
-				debug_print(f"Error loading space access {access_item.wiki_space_access}: {e}")
-		
-		debug_print(f"User {user} has access to {len(accessible_pages)} pages")
-		
-		if return_permissions:
-			return page_permissions
-		else:
-			return accessible_pages
-
-	def check_user_access(self, user):
-		"""Check if user has access to this specific wiki page for customized documentation"""
-		
-		debug_print(f"Checking page access for user: {DebugColors.BLUE}{user}{DebugColors.END}, page: {DebugColors.YELLOW}{self.name}{DebugColors.END}")
-		
-		# For guests, use the existing allow_guest logic
-		if user == "Guest":
-			debug_print(f"Guest user - using allow_guest: {self.allow_guest}")
-			return self.allow_guest
-		
-		# Get user's accessible pages
-		accessible_pages = self.get_user_accessible_pages(user)
-		
-		# Check if current page is in user's accessible pages
-		has_access = self.name in accessible_pages
-		
-		debug_print(f"Page {self.name} in user's accessible pages: {DebugColors.CYAN}{has_access}{DebugColors.END}")
-		
-		# If user has no Wiki User Access document, fall back to allow_guest behavior
-		# This allows existing functionality to work while adding customization
-		if not accessible_pages:
-			debug_print(f"No custom access control - falling back to allow_guest: {self.allow_guest}")
-			return self.allow_guest
-		
-		return has_access
-
-	def check_user_edit_permission(self, user):
-		"""Check if user has edit permission for this specific wiki page"""
-		
-		debug_print(f"Checking edit permission for user: {DebugColors.BLUE}{user}{DebugColors.END}, page: {DebugColors.YELLOW}{self.name}{DebugColors.END}")
-		
-		# For guests, no edit permission
-		if user == "Guest":
-			debug_print("Guest user - no edit permission")
-			return False
-		
-		# Get user's page permissions
-		page_permissions = self.get_user_accessible_pages(user, return_permissions=True)
-		
-		# Check if current page has edit permission
-		if self.name in page_permissions:
-			has_edit_permission = page_permissions[self.name].get("edit", False)
-			debug_print(f"Page {self.name} edit permission: {DebugColors.CYAN}{has_edit_permission}{DebugColors.END}")
-			return has_edit_permission
-		
-		# If user has no Wiki User Access document, fall back to general edit permission check
-		if not page_permissions:
-			debug_print(f"No custom access control - checking general edit permission")
-			return frappe.has_permission("Wiki Page", "write", doc=self.name, throw=False)
-		
-		# Page not in user's accessible pages = no edit permission
-		debug_print(f"Page {self.name} not accessible to user - no edit permission")
-		return False
 
 	def set_breadcrumbs(self, context):
 		context.add_breadcrumbs = True
@@ -468,13 +286,6 @@ class WikiPage(WebsiteGenerator):
 		context.new_wiki_page = frappe.form_dict.get("newWiki")
 		context.last_revision = self.get_last_revision()
 		context.show_dropdown = frappe.session.user != "Guest"
-		
-		# Add edit permission context for frontend
-		if frappe.session.user != "Guest":
-			context.user_can_edit = self.check_user_edit_permission(frappe.session.user)
-			debug_print(f"Setting context.user_can_edit = {context.user_can_edit} for page {self.name}")
-		else:
-			context.user_can_edit = False
 		context.number_of_revisions = frappe.db.count("Wiki Page Revision Item", {"wiki_page": self.name})
 		# TODO: group all context values
 		context.hide_on_sidebar = frappe.get_value(
@@ -547,14 +358,6 @@ class WikiPage(WebsiteGenerator):
 	def get_sidebar_items(self):
 		wiki_sidebar = frappe.get_doc("Wiki Space", {"route": self.get_space_route()}).wiki_sidebars
 		sidebar = {}
-		
-		# Get user's accessible pages for customized sidebar
-		current_user = frappe.session.user
-		user_accessible_pages = []
-		
-		if current_user != "Guest":
-			user_accessible_pages = self.get_user_accessible_pages(current_user)
-			debug_print(f"Filtering sidebar for user {current_user} with {len(user_accessible_pages)} accessible pages")
 
 		for sidebar_item in wiki_sidebar:
 			if sidebar_item.hide_on_sidebar:
@@ -562,19 +365,9 @@ class WikiPage(WebsiteGenerator):
 
 			wiki_page = frappe.get_cached_doc("Wiki Page", sidebar_item.wiki_page)
 
-			# Check basic permission (guest access)
-			basic_permitted = wiki_page.allow_guest or current_user != "Guest"
-			if not basic_permitted:
+			permitted = wiki_page.allow_guest or frappe.session.user != "Guest"
+			if not permitted:
 				continue
-			
-			# For logged-in users, check customized access
-			if current_user != "Guest":
-				# If user has custom access control, check if page is in their accessible list
-				if user_accessible_pages:
-					if wiki_page.name not in user_accessible_pages:
-						debug_print(f"Excluding page {wiki_page.name} from sidebar - not in user's accessible pages")
-						continue
-				# If no custom access control, show all pages (fallback behavior)
 
 			if sidebar_item.parent_label not in sidebar:
 				sidebar[sidebar_item.parent_label] = [
@@ -597,7 +390,6 @@ class WikiPage(WebsiteGenerator):
 					}
 				]
 
-		debug_print(f"Sidebar built with {sum(len(items) for items in sidebar.values())} total items")
 		return self.get_items(sidebar)
 
 	def get_last_revision(self):
@@ -734,18 +526,6 @@ def update(
 	new_sidebar_items="",
 	draft=False,
 ):
-	# Check edit permission before allowing update
-	if frappe.session.user != "Guest":
-		try:
-			wiki_page = frappe.get_doc("Wiki Page", name)
-			if not wiki_page.check_user_edit_permission(frappe.session.user):
-				debug_print(f"{DebugColors.RED}Update blocked - user {frappe.session.user} cannot edit page {name}{DebugColors.END}")
-				frappe.throw(_("You don't have permission to edit this page"), frappe.PermissionError)
-		except frappe.DoesNotExistError:
-			# For new pages, check general edit permission
-			if not frappe.has_permission("Wiki Page", "write", throw=False):
-				frappe.throw(_("You don't have permission to create wiki pages"), frappe.PermissionError)
-	
 	context = {"route": name}
 	context = frappe._dict(context)
 	content, file_ids = extract_images_from_html(content)
@@ -842,41 +622,6 @@ def get_sidebar_for_page(wiki_page):
 
 
 @frappe.whitelist()
-def get_user_accessible_pages(user=None, include_permissions=False):
-	"""API endpoint to get all pages accessible to a specific user
-	
-	Args:
-		user: User to check (defaults to current user)
-		include_permissions: If True, returns dict with view/edit permissions
-	"""
-	if not user:
-		user = frappe.session.user
-	
-	if user == "Guest":
-		return [] if not include_permissions else {}
-	
-	# Create a dummy wiki page instance to use the method
-	wiki_page = frappe.get_doc("Wiki Page", {"name": "dummy"})
-	return wiki_page.get_user_accessible_pages(user, return_permissions=bool(include_permissions))
-
-
-@frappe.whitelist()
-def check_user_edit_permission(page_name, user=None):
-	"""API endpoint to check if user can edit a specific page"""
-	if not user:
-		user = frappe.session.user
-	
-	if user == "Guest":
-		return False
-	
-	try:
-		wiki_page = frappe.get_doc("Wiki Page", page_name)
-		return wiki_page.check_user_edit_permission(user)
-	except frappe.DoesNotExistError:
-		return False
-
-
-@frappe.whitelist()
 def approve(wiki_page_patch):
 	if not frappe.has_permission(doctype="Wiki Page Patch", ptype="submit", throw=False):
 		frappe.throw(
@@ -906,20 +651,7 @@ def delete_wiki_page(wiki_page_route):
 
 
 @frappe.whitelist(allow_guest=True)
-def has_edit_permission(page_name=None):
-	"""Check if current user has edit permission for Wiki Pages in general or specific page"""
-	if frappe.session.user == "Guest":
-		return False
-	
-	# If specific page is provided, check custom edit permissions
-	if page_name:
-		try:
-			wiki_page = frappe.get_doc("Wiki Page", page_name)
-			return wiki_page.check_user_edit_permission(frappe.session.user)
-		except frappe.DoesNotExistError:
-			return False
-	
-	# General Wiki Page write permission
+def has_edit_permission():
 	return frappe.has_permission(doctype="Wiki Page", ptype="write", throw=False)
 
 
