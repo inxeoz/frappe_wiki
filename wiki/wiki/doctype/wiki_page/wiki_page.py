@@ -155,6 +155,7 @@ class WikiPage(WebsiteGenerator):
 	def verify_permission(self):
 		wiki_settings = frappe.get_single("Wiki Settings")
 		user_is_guest = frappe.session.user == "Guest"
+		current_user = frappe.session.user
 
 		disable_guest_access = False
 		if wiki_settings.disable_guest_access and user_is_guest:
@@ -162,10 +163,57 @@ class WikiPage(WebsiteGenerator):
 
 		access_permitted = self.allow_guest or not user_is_guest
 
+		# Check user-specific access control for all users (including logged-in)
+		if not user_is_guest:
+			access_permitted = access_permitted and self.check_user_access(current_user)
+
 		if not access_permitted or disable_guest_access:
 			frappe.local.response["type"] = "redirect"
 			frappe.local.response["location"] = "/login?" + urlencode({"redirect-to": frappe.request.url})
 			raise frappe.Redirect
+
+	def check_user_access(self, user):
+		"""Check if user has access to this wiki page through access control system"""
+		
+		# Get user's wiki access
+		user_access = frappe.get_value("Wiki User Access", 
+									   {"user": user, "docstatus": 1}, 
+									   "name")
+		
+		if not user_access:
+			# No specific access control = DENY access (default behavior: explicit permission required)
+			return False
+		
+		# Get user's access list
+		wiki_access_list = frappe.get_all("Wiki Access", 
+										  filters={"parent": user_access, "enabled": 1},
+										  fields=["wiki_space_access"])
+		
+		# Get current page's wiki space
+		wiki_space = frappe.get_value("Wiki Group Item", 
+									  {"wiki_page": self.name}, 
+									  "parent")
+		
+		if not wiki_space:
+			return False  # No space = deny access (require explicit permission)
+		
+		# Check if user has access to this space
+		for access_item in wiki_access_list:
+			space_access = frappe.get_doc("Wiki Space Access", access_item.wiki_space_access)
+			
+			if space_access.wiki_space == wiki_space:
+				# Check specific page access
+				page_access = frappe.get_value("Wiki Page Access",
+											  {"parent": space_access.name, "page": self.name},
+											  "visible")
+				
+				if page_access is not None:
+					return bool(page_access)  # Explicit page setting (0 or 1)
+				else:
+					return True  # Space access without explicit page restriction = allow
+		
+		# User doesn't have access to this space = deny
+		return False
 
 	def set_breadcrumbs(self, context):
 		context.add_breadcrumbs = True

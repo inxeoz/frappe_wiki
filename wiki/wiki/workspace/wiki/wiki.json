@@ -1,7 +1,7 @@
 {
  "app": "wiki",
  "charts": [],
- "content": "[{\"id\":\"f6laZQUa0x\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\">Wiki</span>\",\"col\":12}},{\"id\":\"ir8Llemis5\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Wiki Pages\",\"col\":4}},{\"id\":\"tZQ_AtqABm\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Wiki Space\",\"col\":4}},{\"id\":\"z4qT3yMggL\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Wiki Settings\",\"col\":4}},{\"id\":\"cTIBC0weUT\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Wiki Page Patches\",\"col\":4}},{\"id\":\"HHnfjv4kN0\",\"type\":\"spacer\",\"data\":{\"col\":12}},{\"id\":\"8Xpm-pMwWu\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Wiki Space Access\",\"col\":3}},{\"id\":\"gcPTt8DUpO\",\"type\":\"spacer\",\"data\":{\"col\":12}},{\"id\":\"IfrRKY62Tc\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Wiki Feedback\",\"col\":4}},{\"id\":\"BsC6YwujPn\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Wiki Page Revisions\",\"col\":4}},{\"id\":\"3gsyKHzfOC\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\"><b>Reports</b></span>\",\"col\":12}},{\"id\":\"SI4uvLzSVb\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Broken Links Report\",\"col\":4}}]",
+ "content": "[{\"id\":\"f6laZQUa0x\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\">Wiki</span>\",\"col\":12}},{\"id\":\"ir8Llemis5\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Wiki Pages\",\"col\":4}},{\"id\":\"tZQ_AtqABm\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Wiki Space\",\"col\":4}},{\"id\":\"z4qT3yMggL\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Wiki Settings\",\"col\":4}},{\"id\":\"cTIBC0weUT\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Wiki Page Patches\",\"col\":4}},{\"id\":\"HHnfjv4kN0\",\"type\":\"spacer\",\"data\":{\"col\":12}},{\"id\":\"8Xpm-pMwWu\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Wiki Space Access\",\"col\":3}},{\"id\":\"K9uLelNj7F\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Wiki User Access\",\"col\":3}},{\"id\":\"gcPTt8DUpO\",\"type\":\"spacer\",\"data\":{\"col\":12}},{\"id\":\"IfrRKY62Tc\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Wiki Feedback\",\"col\":4}},{\"id\":\"BsC6YwujPn\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Wiki Page Revisions\",\"col\":4}},{\"id\":\"3gsyKHzfOC\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\"><b>Reports</b></span>\",\"col\":12}},{\"id\":\"SI4uvLzSVb\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Broken Links Report\",\"col\":4}}]",
  "creation": "2022-09-25 16:45:20.547072",
  "custom_blocks": [],
  "docstatus": 0,
@@ -13,7 +13,7 @@
  "is_hidden": 0,
  "label": "Wiki",
  "links": [],
- "modified": "2025-09-15 15:44:12.760448",
+ "modified": "2025-09-16 10:22:10.169641",
  "modified_by": "Administrator",
  "module": "Wiki",
  "name": "Wiki",
@@ -39,6 +39,14 @@
    "label": "Wiki Pages",
    "link_to": "Wiki Page",
    "stats_filter": "{\"published\":[\"=\",1]}",
+   "type": "DocType"
+  },
+  {
+   "color": "Grey",
+   "doc_view": "List",
+   "label": "Wiki User Access",
+   "link_to": "Wiki User Access",
+   "stats_filter": "[]",
    "type": "DocType"
   },
   {

@@ -2,15 +2,15 @@
  "_liked_by": "[\"Administrator\"]",
  "actions": [],
  "allow_rename": 1,
+ "autoname": "autoincrement",
  "creation": "2025-09-15 12:33:09.655427",
  "doctype": "DocType",
  "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
   "section_break_jjcj",
+  "title",
   "wiki_space",
-  "column_break_upbr",
-  "fetch_page",
   "section_break_fjxd",
   "access_list",
   "amended_from"
@@ -46,27 +46,25 @@
    "fieldtype": "Section Break"
   },
   {
-   "fieldname": "column_break_upbr",
-   "fieldtype": "Column Break"
-  },
-  {
-   "fieldname": "fetch_page",
-   "fieldtype": "Button",
-   "label": "Fetch Page"
-  },
-  {
    "fieldname": "section_break_fjxd",
    "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "title",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "title"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2025-09-15 14:58:25.976394",
+ "modified": "2025-09-15 17:32:20.134851",
  "modified_by": "Administrator",
  "module": "Wiki",
  "name": "Wiki Space Access",
+ "naming_rule": "Autoincrement",
  "owner": "Administrator",
  "permissions": [
   {
